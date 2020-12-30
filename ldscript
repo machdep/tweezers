@@ -1,0 +1,66 @@
+TARGET("elf32-tradlittlemips")
+ENTRY(_start)
+
+MEMORY
+{
+	boot         (rx) : ORIGIN = 0x9fc00000,  LENGTH = 5888
+	devcfg        (r) : ORIGIN = 0x9fc01780,  LENGTH = 16
+	prog         (rx) : ORIGIN = 0x9d000000,  LENGTH = 16K
+	sram       (rw!x) : ORIGIN = 0xa0000000,  LENGTH = 4K
+}
+
+SECTIONS
+{
+	. = 0x9fc00000;
+	.start . : {
+		*start.o(.text)
+	} > boot
+
+	. = 0x9fc01780;
+	.devcfg : {
+		*(.config3)
+		*(.config2)
+		*(.config1)
+		*(.config0)
+	} > devcfg
+
+	. = 0x9d000000;
+	.exception : {
+		. = . + 0x180;
+		*exception.o(.text)
+	} > prog
+
+	.text : {
+		*(.text)
+	} > prog
+
+	.rodata : {
+		*(.rodata)
+	} > prog
+
+	.sysinit : {
+		__sysinit_start = ABSOLUTE(.);
+		*(.sysinit)
+		__sysinit_end = ABSOLUTE(.);
+	} > prog
+
+	/* Ensure _smem is associated with the next section */
+	. = .;
+	_smem = ABSOLUTE(.);
+	.data : {
+		_sdata = ABSOLUTE(.);
+		*(.data)
+		_edata = ABSOLUTE(.);
+	} > sram AT > prog
+
+	.sdata : {
+		_gp = .;
+		*(.sdata)
+	} > sram AT > prog
+
+	.bss : {
+		_sbss = ABSOLUTE(.);
+		*(.bss COMMON)
+		_ebss = ABSOLUTE(.);
+	} > sram
+}
