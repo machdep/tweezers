@@ -318,6 +318,7 @@ tweezers(void)
 {
 	struct pic32_port_softc *sc;
 	struct solder_softc *ssc;
+	struct i2c_msg msgs[1];
 
 	int ret;
 	uint8_t cfg;
@@ -335,15 +336,6 @@ tweezers(void)
 
 	pic32_port_ansel(sc, PORT_B, 14, 0);
 	pic32_port_tris(sc, PORT_B, 14, PORT_OUTPUT);
-
-	/* Initialize i2c bitbang. */
-#if 0
-	i2c_bitbang_sc.i2c_sda = i2c_sda1;
-	i2c_bitbang_sc.i2c_scl = i2c_scl1;
-	i2c_bitbang_sc.i2c_sda_val = i2c_sda_val;
-#endif
-
-	struct i2c_msg msgs[1];
 
 	cfg = 0x10 | (1 << 2);
 	msgs[0].slave = 0x68;
@@ -416,7 +408,6 @@ tweezers(void)
 	}
 #endif
 
-#if 1
 	while (1) {
 		udelay(30000);
 		if (ssc->enable == 0) {
@@ -460,43 +451,6 @@ tweezers(void)
 			pic32_gate(&port_sc, 0, 0);
 		}
 	}
-
-#else
-
-	int skip0, skip1;
-
-	skip0 = 0;
-	skip1 = 0;
-	while (1) {
-		if (skip0 == 1) {
-			pic32_gate(&port_sc, 0, 0);
-			skip0--;
-		} else if (skip0 == 0) {
-			mv0 = get_mv(sc, 0);
-			t0 = get_delay(mv0);
-			if (mv0 >= 0 && mv0 < 19) {
-				pic32_gate(&port_sc, 0, 1);
-				skip0 = t0 / 10000;
-			}
-		} else
-			skip0--;
-
-		if (skip1 == 1) {
-			pic32_gate(&port_sc, 1, 0);
-			skip1--;
-		} else if (skip1 == 0) {
-			mv1 = get_mv(sc, 1);
-			t1 = get_delay(mv1);
-			if (mv1 >= 0 && mv1 < 19) {
-				pic32_gate(&port_sc, 1, 1);
-				skip1 = t1 / 10000;
-			}
-		} else
-			skip1--;
-
-		udelay(10000);
-	}
-#endif
 
 	return (0);
 }
