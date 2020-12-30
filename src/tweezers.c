@@ -35,6 +35,7 @@
 #include <machine/frame.h>
 
 #include <mips/mips/trap.h>
+#include <mips/mips/timer.h>
 
 #include <mips/microchip/pic32.h>
 #include <mips/microchip/pic32_adc.h>
@@ -42,20 +43,18 @@
 #include <mips/microchip/pic32_uart.h>
 #include <mips/microchip/pic32_port.h>
 #include <mips/microchip/pic32mm_pps.h>
-#include <mips/microchip/pic32_ccp.h>
 #include <mips/microchip/pic32_intc.h>
 
 #include <dev/i2c/bitbang/i2c_bitbang.h>
 
 PIC32MM_DEVCFG;
 
-/* Software contexts */
+/* Software contexts (static allocation). */
 static struct pic32_uart_softc uart_sc;
 static struct pic32_port_softc port_sc;
 static struct pic32_pps_softc pps_sc;
-static struct pic32_ccp_softc ccp_sc;
-static struct pic32_ccp_softc ccp2_sc;
 static struct pic32_adc_softc adc_sc;
+static struct pic32_ccp_softc ccp_sc;
 static struct pic32_intc_softc intc_sc;
 static struct i2c_bitbang_softc i2c_bitbang_sc;
 static struct mdx_device dev_bitbang = { .sc = &i2c_bitbang_sc };
@@ -81,24 +80,6 @@ solder_led_w(struct pic32_port_softc *sc, int enable)
 		pic32_port_lat(&port_sc, PORT_A, 3, 1);
 	else
 		pic32_port_lat(&port_sc, PORT_A, 3, 0);
-}
-
-static void
-solder_ccp_cb(void *arg)
-{
-	struct solder_softc *sc;
-
-	sc = &solder_sc;
-
-	printf("%s\n", __func__);
-
-	pic32_ccp_sched(&ccp2_sc, 0, NULL, NULL);
-
-	if (sc->button == 1) {
-		solder_led_w(&port_sc, 1);
-		//solder_led_b(&port_sc, 1);
-		sc->enable = 1;
-	}
 }
 
 static void
@@ -136,9 +117,10 @@ solder_intr(void *arg, uint32_t cnf)
 			sc->enable = 0;
 			solder_led_w(&port_sc, 0);
 			//solder_led_b(&port_sc, 0);
-		} else
-			pic32_ccp_sched(&ccp2_sc, 400000, solder_ccp_cb,
-			    &ccp2_sc);
+		} else {
+			solder_led_w(&port_sc, 1);
+			sc->enable = 1;
+		}
 	} else
 		sc->button = 0;
 }
@@ -147,10 +129,12 @@ static const struct intc_intr_entry intc_intr_map[48] = {
 	[_CHANGE_NOTICE_B_VECTOR] = { pic32_port_intr, (void *)&port_sc },
 	[_CCP1_VECTOR] = { pic32_ccp_intr, (void *)&ccp_sc },
 	[_CCT1_VECTOR] = { pic32_ccp_intr, (void *)&ccp_sc },
-	[_CCP2_VECTOR] = { pic32_ccp_intr, (void *)&ccp2_sc },
-	[_CCT2_VECTOR] = { pic32_ccp_intr, (void *)&ccp2_sc },
+#if 0
+	[_CCP2_VECTOR] = { pic32_ccp_intr, (void *)&ccp_sc },
+	[_CCT2_VECTOR] = { pic32_ccp_intr, (void *)&ccp_sc },
 	[_CCP3_VECTOR] = { pic32_ccp_intr, (void *)&ccp_sc },
 	[_CCT3_VECTOR] = { pic32_ccp_intr, (void *)&ccp_sc },
+#endif
 };
 
 static const struct port_intr_entry port_intr_map[48] = {
@@ -481,8 +465,6 @@ board_init(void)
 	pic32_uart_init(&uart_sc, UART2_BASE, 19200, 8000000, 1);
 	mdx_console_register(uart_putchar, (void *)&uart_sc);
 
-	pic32_ccp_init(&ccp_sc, CCP1_BASE);
-	pic32_ccp_init(&ccp2_sc, CCP2_BASE);
 	pic32_intc_init(&intc_sc, INTC_BASE);
 
 	mips_wr_ebase(0x9d000000);
@@ -531,6 +513,7 @@ main(void)
 	sc->button = 0;
 	sc->enable = 0;
 
+	pic32_ccp_init(&ccp_sc, CCP1_BASE, 122000);
 	i2c_bitbang_init(&dev_bitbang, &i2c_ops);
 
 	tweezers();
