@@ -192,17 +192,6 @@ pic32_gate(struct pic32_port_softc *sc, uint8_t unit, uint8_t enable)
 	}
 }
 
-#if 0
-static void
-solder_ports_init(struct pic32_port_softc *sc)
-{
-
-	/* LED light */
-	pic32_port_lat(&port_sc, PORT_C, 9, 0);
-	pic32_port_tris(&port_sc, PORT_C, 9, PORT_OUTPUT);
-}
-#endif
-
 static void
 i2c_sda1(void *arg, bool enable)
 {
@@ -241,14 +230,6 @@ i2c_sda_val(void *arg)
 
 	return (0);
 }
-
-#if 0
-static void
-i2c_write_config(struct pic32_port_softc *sc, uint8_t cfg)
-{
-
-}
-#endif
 
 static int
 get_mv(struct pic32_port_softc *sc, uint8_t unit)
@@ -311,8 +292,6 @@ tweezers_configure(void)
 
 	sc = &port_sc;
 
-	printf("Hello world\n");
-
 	pic32_port_ansel(sc, PORT_B, 12, 1);
 	pic32_port_ansel(sc, PORT_B, 13, 1);
 
@@ -354,10 +333,6 @@ tweezers_configure(void)
 	pic32_port_install_intr_map(sc, port_intr_map);
 	pic32_port_cnen(sc, PORT_B, 15, 1, 1);
 	pic32_port_cncon(sc, PORT_B, 1, 1);
-
-	//pic32_port_ansel(sc, PORT_B, 3, 0);
-	//pic32_port_tris(sc, PORT_B, 3, PORT_INPUT);
-	//pic32_port_tris(sc, PORT_B, 3, PORT_OUTPUT);
 
 	pic32_adc_init(&adc_sc, ADC1_BASE);
 }
@@ -448,15 +423,13 @@ board_init(void)
 	mtc0(12, 0, 1);
 
 	pic32_pps_init(&pps_sc, PPS_BASE);
-
 	pic32_port_init(&port_sc, PORTS_BASE);
-	//solder_ports_init(&port_sc);
 
-	//TX
+	/* UART TX */
 	pic32_port_ansel(&port_sc, PORT_A, 0, 1);
 	*(volatile uint32_t *)0xBF802590 = (1 << 0); //rp1 TX
 
-	//RX
+	/* UART RX */
 	pic32_port_ansel(&port_sc, PORT_A, 1, 1);
 	pic32_port_tris(&port_sc, PORT_A, 1, PORT_INPUT);
 	*(volatile uint32_t *)0xBF802520 = (2 << 16); //rpinr9 RX RP2
@@ -511,6 +484,8 @@ main(void)
 	sc = &solder_sc;
 	sc->button = 0;
 	sc->enable = 0;
+
+	printf("Hello world\n");
 
 	pic32_ccp_init(&ccp_sc, CCP1_BASE, 122000);
 	i2c_bitbang_init(&dev_bitbang, &i2c_ops);
