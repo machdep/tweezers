@@ -141,6 +141,7 @@ static const struct port_intr_entry port_intr_map[48] = {
 	[_CHANGE_NOTICE_B_VECTOR] = { PORT_B, solder_intr, (void *)&port_sc },
 };
 
+/* This is needed for the i2c bitbang. */
 void
 udelay(uint32_t usec)
 {
@@ -388,12 +389,12 @@ tweezers(void)
 		mv1 = get_mv(sc, 1);
 		printf("mv %d %d\n", mv0, mv1);
 
-		udelay(500000);
+		mdx_usleep(500000);
 	}
 #endif
 
 	while (1) {
-		udelay(30000);
+		mdx_usleep(30000);
 		if (ssc->enable == 0) {
 			pic32_gate(&port_sc, 0, 0);
 			pic32_gate(&port_sc, 1, 0);
@@ -424,14 +425,14 @@ tweezers(void)
 		/* Delay and remove power from both channels. */
 
 		if (t1 > t0) {
-			udelay(t0);
+			mdx_usleep(t0);
 			pic32_gate(&port_sc, 0, 0);
-			udelay(t1 - t0);
+			mdx_usleep(t1 - t0);
 			pic32_gate(&port_sc, 1, 0);
 		} else {
-			udelay(t1);
+			mdx_usleep(t1);
 			pic32_gate(&port_sc, 1, 0);
-			udelay(t0 - t1);
+			mdx_usleep(t0 - t1);
 			pic32_gate(&port_sc, 0, 0);
 		}
 	}
