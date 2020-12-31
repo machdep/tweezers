@@ -62,6 +62,8 @@ static struct mdx_device dev_bitbang = { .sc = &i2c_bitbang_sc };
 // RB12 SDA
 // RB13 SCL
 
+#define	dprintf(fmt, ...)
+
 struct solder_softc {
 	uint8_t button;
 	uint8_t enable;
@@ -101,8 +103,9 @@ solder_intr(void *arg, uint32_t cnf)
 
 	sc = &solder_sc;
 
-	//printf("%s: cnf %x\n", __func__, cnf);
+	dprintf("%s: cnf %x\n", __func__, cnf);
 
+	/* We only expect pin 15 interrupts. */
 	if ((cnf & (1 << 15)) == 0)
 		return;
 
@@ -116,7 +119,6 @@ solder_intr(void *arg, uint32_t cnf)
 		if (sc->enable) {
 			sc->enable = 0;
 			solder_led_w(&port_sc, 0);
-			//solder_led_b(&port_sc, 0);
 		} else {
 			solder_led_w(&port_sc, 1);
 			sc->enable = 1;
@@ -298,51 +300,50 @@ get_delay(int mv)
 	return (val);
 }
 
-static int
-tweezers(void)
+static void
+tweezers_configure(void)
 {
 	struct pic32_port_softc *sc;
-	struct solder_softc *ssc;
 	struct i2c_msg msgs[1];
 
 	int ret;
 	uint8_t cfg;
 
 	sc = &port_sc;
-	ssc = &solder_sc;
 
 	printf("Hello world\n");
 
 	pic32_port_ansel(sc, PORT_B, 12, 1);
 	pic32_port_ansel(sc, PORT_B, 13, 1);
 
-	//port input drives 1
-	//port output drives 0
+	/*
+	 * port input drives 1
+	 * port output drives 0
+	 */
 
 	pic32_port_ansel(sc, PORT_B, 14, 0);
 	pic32_port_tris(sc, PORT_B, 14, PORT_OUTPUT);
 
+	/* Configure the MCP3421A0. */
 	cfg = 0x10 | (1 << 2);
 	msgs[0].slave = 0x68;
 	msgs[0].buf = &cfg;
 	msgs[0].len = 1;
 	msgs[0].flags =	0;
-
 	ret = mdx_i2c_transfer(&dev_bitbang, msgs, 1);
 	if (ret == 0)
-		printf("cfg wrotten\n");
+		printf("A0 cfg wrotten\n");
 
+	/* Configure the MCP3421A1. */
 	msgs[0].slave = 0x69;
 	msgs[0].buf = &cfg;
 	msgs[0].len = 1;
 	msgs[0].flags =	0;
-
 	ret = mdx_i2c_transfer(&dev_bitbang, msgs, 1);
 	if (ret == 0)
-		printf("cfg wrotten\n");
+		printf("A1 cfg wrotten\n");
 
 	pic32_port_ansel(sc, PORT_A, 3, 0);
-	pic32_port_tris(sc, PORT_A, 3, PORT_INPUT);
 	pic32_port_tris(sc, PORT_A, 3, PORT_OUTPUT);
 
 	/* Button */
@@ -354,26 +355,25 @@ tweezers(void)
 	pic32_port_cnen(sc, PORT_B, 15, 1, 1);
 	pic32_port_cncon(sc, PORT_B, 1, 1);
 
-	//pic32_port_ansel(sc, PORT_B, 15, 0);
-	//pic32_port_tris(sc, PORT_B, 15, PORT_INPUT);
-	//pic32_port_tris(sc, PORT_B, 15, PORT_OUTPUT);
-
-	pic32_port_ansel(sc, PORT_B, 3, 0);
-	pic32_port_tris(sc, PORT_B, 3, PORT_INPUT);
-	pic32_port_tris(sc, PORT_B, 3, PORT_OUTPUT);
+	//pic32_port_ansel(sc, PORT_B, 3, 0);
+	//pic32_port_tris(sc, PORT_B, 3, PORT_INPUT);
+	//pic32_port_tris(sc, PORT_B, 3, PORT_OUTPUT);
 
 	pic32_adc_init(&adc_sc, ADC1_BASE);
+}
 
-#if 0
-	pic32_led(&port_sc, 1);
-	pic32_gate(&port_sc, 0, 1);
-	pic32_gate(&port_sc, 1, 1);
-	while (1);
-#endif
-
+static void
+tweezers(void)
+{
+	struct pic32_port_softc *sc;
+	struct solder_softc *ssc;
 	uint32_t mv0;
 	uint32_t mv1;
 	int t0, t1;
+
+	ssc = &solder_sc;
+
+	sc = &port_sc;
 
 	//white led
 	pic32_led(&port_sc, 0);
@@ -436,8 +436,6 @@ tweezers(void)
 			pic32_gate(&port_sc, 0, 0);
 		}
 	}
-
-	return (0);
 }
 
 void
@@ -517,6 +515,7 @@ main(void)
 	pic32_ccp_init(&ccp_sc, CCP1_BASE, 122000);
 	i2c_bitbang_init(&dev_bitbang, &i2c_ops);
 
+	tweezers_configure();
 	tweezers();
 
 	/* NOT REACHED */
