@@ -30,6 +30,8 @@
 #include <sys/thread.h>
 #include <sys/console.h>
 
+#include <dev/i2c/bitbang/i2c_bitbang.h>
+
 #include <machine/cpuregs.h>
 #include <machine/cpufunc.h>
 #include <machine/frame.h>
@@ -45,8 +47,6 @@
 #include <mips/microchip/pic32mm_pps.h>
 #include <mips/microchip/pic32_intc.h>
 
-#include <dev/i2c/bitbang/i2c_bitbang.h>
-
 PIC32MM_DEVCFG;
 
 /* Software contexts (static allocation). */
@@ -59,10 +59,10 @@ static struct pic32_intc_softc intc_sc;
 static struct i2c_bitbang_softc i2c_bitbang_sc;
 static struct mdx_device dev_bitbang = { .sc = &i2c_bitbang_sc };
 
-// RB12 SDA
-// RB13 SCL
-
 #define	dprintf(fmt, ...)
+
+#define	C0_COMPARE	11
+#define	C0_COUNT	9
 
 struct solder_softc {
 	uint8_t button;
@@ -164,18 +164,6 @@ uart_putchar(int c, void *arg)
 	pic32_putc(sc, c);
 }
 
-#define C0_COMPARE      11 
-#define C0_COUNT            9 
-
-static void
-pic32_led(struct pic32_port_softc *sc, uint8_t enable)
-{
-
-	pic32_port_ansel(sc, PORT_A, 3, 1);
-	pic32_port_tris(sc, PORT_A, 3, PORT_OUTPUT);
-	pic32_port_lat(sc, PORT_A, 3, enable);
-}
-
 static void
 pic32_gate(struct pic32_port_softc *sc, uint8_t unit, uint8_t enable)
 {
@@ -193,7 +181,7 @@ pic32_gate(struct pic32_port_softc *sc, uint8_t unit, uint8_t enable)
 }
 
 static void
-i2c_sda1(void *arg, bool enable)
+i2c_sda(void *arg, bool enable)
 {
 	struct pic32_port_softc *sc;
 
@@ -206,7 +194,7 @@ i2c_sda1(void *arg, bool enable)
 }
 
 static void
-i2c_scl1(void *arg, bool enable)
+i2c_scl(void *arg, bool enable)
 {
 	struct pic32_port_softc *sc;
 
@@ -350,8 +338,7 @@ tweezers(void)
 
 	sc = &port_sc;
 
-	//white led
-	pic32_led(&port_sc, 0);
+	solder_led_w(&port_sc, 0);
 
 #if 0
 	while (1) {
@@ -471,8 +458,8 @@ board_init(void)
 }
 
 static struct i2c_bitbang_ops i2c_ops = {
-	.i2c_scl = &i2c_scl1,
-	.i2c_sda = &i2c_sda1,
+	.i2c_scl = &i2c_scl,
+	.i2c_sda = &i2c_sda,
 	.i2c_sda_val = &i2c_sda_val,
 };
 
