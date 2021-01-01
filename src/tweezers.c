@@ -270,15 +270,11 @@ get_delay(int mv)
 }
 
 static void
-tweezers_configure(void)
+tweezers_configure(struct pic32_port_softc *sc)
 {
-	struct pic32_port_softc *sc;
 	struct i2c_msg msgs[1];
-
-	int ret;
 	uint8_t cfg;
-
-	sc = &port_sc;
+	int ret;
 
 	pic32_port_ansel(sc, PORT_B, 12, 1);
 	pic32_port_ansel(sc, PORT_B, 13, 1);
@@ -326,34 +322,13 @@ tweezers_configure(void)
 }
 
 static void
-tweezers(void)
+tweezers(struct pic32_port_softc *sc, struct solder_softc *ssc)
 {
-	struct pic32_port_softc *sc;
-	struct solder_softc *ssc;
 	uint32_t mv0;
 	uint32_t mv1;
 	int t0, t1;
 
-	ssc = &solder_sc;
-
-	sc = &port_sc;
-
 	solder_led_w(&port_sc, 0);
-
-#if 0
-	while (1) {
-		printf("Test\n");
-
-		pic32_gate(&port_sc, 0, 0); //red
-		pic32_gate(&port_sc, 1, 0); //orange
-
-		mv0 = get_mv(sc, 0);
-		mv1 = get_mv(sc, 1);
-		printf("mv %d %d\n", mv0, mv1);
-
-		mdx_usleep(500000);
-	}
-#endif
 
 	while (1) {
 		mdx_usleep(30000);
@@ -414,12 +389,12 @@ board_init(void)
 
 	/* UART TX */
 	pic32_port_ansel(&port_sc, PORT_A, 0, 1);
-	*(volatile uint32_t *)0xBF802590 = (1 << 0); //rp1 TX
+	*(volatile uint32_t *)0xBF802590 = (1 << 0); /* rp1 TX */
 
 	/* UART RX */
 	pic32_port_ansel(&port_sc, PORT_A, 1, 1);
 	pic32_port_tris(&port_sc, PORT_A, 1, PORT_INPUT);
-	*(volatile uint32_t *)0xBF802520 = (2 << 16); //rpinr9 RX RP2
+	*(volatile uint32_t *)0xBF802520 = (2 << 16); /* rpinr9 RX RP2 */
 
 	pic32_uart_init(&uart_sc, UART2_BASE, 19200, 8000000, 1);
 	mdx_console_register(uart_putchar, (void *)&uart_sc);
@@ -466,19 +441,21 @@ static struct i2c_bitbang_ops i2c_ops = {
 int
 main(void)
 {
-	struct solder_softc *sc;
-
-	sc = &solder_sc;
-	sc->button = 0;
-	sc->enable = 0;
+	struct pic32_port_softc *sc;
+	struct solder_softc *ssc;
 
 	printf("Hello world\n");
+
+	sc = &port_sc;
+	ssc = &solder_sc;
+	ssc->button = 0;
+	ssc->enable = 0;
 
 	pic32_ccp_init(&ccp_sc, CCP1_BASE, 122000);
 	i2c_bitbang_init(&dev_bitbang, &i2c_ops);
 
-	tweezers_configure();
-	tweezers();
+	tweezers_configure(sc);
+	tweezers(sc, ssc);
 
 	/* NOT REACHED */
 
