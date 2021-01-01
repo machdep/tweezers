@@ -53,7 +53,6 @@ PIC32MM_DEVCFG;
 static struct pic32_uart_softc uart_sc;
 static struct pic32_port_softc port_sc;
 static struct pic32_pps_softc pps_sc;
-static struct pic32_adc_softc adc_sc;
 static struct pic32_ccp_softc ccp_sc;
 static struct pic32_intc_softc intc_sc;
 static struct i2c_bitbang_softc i2c_bitbang_sc;
@@ -269,12 +268,35 @@ get_delay(int mv)
 	return (val);
 }
 
-static void
-tweezers_configure(struct pic32_port_softc *sc)
+static int
+mcp3421_configure(uint8_t slave)
 {
 	struct i2c_msg msgs[1];
 	uint8_t cfg;
 	int ret;
+
+	/* Configure the MCP3421. */
+	cfg = 0x10 | (1 << 2);
+	msgs[0].slave = slave;
+	msgs[0].buf = &cfg;
+	msgs[0].len = 1;
+	msgs[0].flags =	0;
+	ret = mdx_i2c_transfer(&dev_bitbang, msgs, 1);
+	if (ret != 0) {
+		printf("%s: could not configure mcp3421, slave %x\n",
+		    __func__, slave);
+		return (ret);
+	}
+
+	printf("cfg written\n");
+
+	return (0);
+}
+
+static void
+tweezers_configure(struct pic32_port_softc *sc)
+{
+	int error;
 
 	pic32_port_ansel(sc, PORT_B, 12, 1);
 	pic32_port_ansel(sc, PORT_B, 13, 1);
@@ -287,24 +309,12 @@ tweezers_configure(struct pic32_port_softc *sc)
 	pic32_port_ansel(sc, PORT_B, 14, 0);
 	pic32_port_tris(sc, PORT_B, 14, PORT_OUTPUT);
 
-	/* Configure the MCP3421A0. */
-	cfg = 0x10 | (1 << 2);
-	msgs[0].slave = 0x68;
-	msgs[0].buf = &cfg;
-	msgs[0].len = 1;
-	msgs[0].flags =	0;
-	ret = mdx_i2c_transfer(&dev_bitbang, msgs, 1);
-	if (ret == 0)
-		printf("A0 cfg wrotten\n");
-
-	/* Configure the MCP3421A1. */
-	msgs[0].slave = 0x69;
-	msgs[0].buf = &cfg;
-	msgs[0].len = 1;
-	msgs[0].flags =	0;
-	ret = mdx_i2c_transfer(&dev_bitbang, msgs, 1);
-	if (ret == 0)
-		printf("A1 cfg wrotten\n");
+	error = mcp3421_configure(0x68);
+	if (error != 0)
+		panic("could not configure a0");
+	error = mcp3421_configure(0x69);
+	if (error != 0)
+		panic("could not configure a1");
 
 	pic32_port_ansel(sc, PORT_A, 3, 0);
 	pic32_port_tris(sc, PORT_A, 3, PORT_OUTPUT);
@@ -317,8 +327,6 @@ tweezers_configure(struct pic32_port_softc *sc)
 	pic32_port_install_intr_map(sc, port_intr_map);
 	pic32_port_cnen(sc, PORT_B, 15, 1, 1);
 	pic32_port_cncon(sc, PORT_B, 1, 1);
-
-	pic32_adc_init(&adc_sc, ADC1_BASE);
 }
 
 static void
